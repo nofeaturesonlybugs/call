@@ -14,8 +14,7 @@ func ExampleStat() {
 	var talk examples.Talker
 	methods := call.Stat(talk)
 	for _, method := range methods.Methods {
-		// Second return value are pointers-to-args and aren't needed here.
-		args, _ := method.Args()
+		args := method.Args()
 		fmt.Println(method.Pretty())
 		result := method.Call(args)
 		if result.Error != nil {
@@ -56,7 +55,7 @@ func BenchmarkStat(b *testing.B) {
 	}
 }
 
-func ExampleMethodInfo_Call_swapReceiver() {
+func ExampleMethods_swapReceiver() {
 	var bob, sally *examples.Person
 	bob = &examples.Person{
 		Name: "Bob",
@@ -68,16 +67,16 @@ func ExampleMethodInfo_Call_swapReceiver() {
 	}
 	methods := call.Stat(bob)
 	for _, m := range methods.Methods {
-		values, _ := m.Args()
-		rv := m.Call(values)
+		args := m.Args()
+		rv := m.Call(args)
 		for _, v := range rv.Values {
 			fmt.Println(v)
 		}
 	}
 	methods.Receiver.Rebind(sally)
 	for _, m := range methods.Methods {
-		values, _ := m.Args()
-		rv := m.Call(values)
+		args := m.Args()
+		rv := m.Call(args)
 		for _, v := range rv.Values {
 			fmt.Println(v)
 		}

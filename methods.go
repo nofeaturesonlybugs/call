@@ -1,6 +1,9 @@
 package call
 
 // Methods summarizes a type and its methods.
+//
+// Methods and each element in Methods.Methods are bound to the same receiver; see
+// the Methods (SwapReceiver) example for an example of rebinding the receiver.
 type Methods struct {
 	Receiver *Receiver
 	Methods  []MethodInfo
@@ -29,10 +32,10 @@ func (m Methods) Copy() Methods {
 	//
 	cp := Methods{
 		Receiver: receiver,
-		Methods:  m.Methods,
+		Methods:  append([]MethodInfo{}, m.Methods...),
 	}
 	for k := range cp.Methods {
-		cp.Methods[k].Receiver = cp.Receiver
+		cp.Methods[k].receiver = cp.Receiver
 	}
 	return cp
 }
