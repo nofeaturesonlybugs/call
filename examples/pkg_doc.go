@@ -79,5 +79,7 @@ func (h HTTP) Handler(w http.ResponseWriter, req *http.Request, sess Session, fo
 // ManyArgs has a method with many arguments.
 type ManyArgs struct{}
 
+// Many has more arguments than our argument pooling expects and exists to benchmark the
+// resulting performance.
 func (m ManyArgs) Many(r Response, req *Request, sess Session, a, b, c *Request) {
 }
