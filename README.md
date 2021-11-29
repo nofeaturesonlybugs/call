@@ -5,3 +5,5 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Package `call` is a small wrapper around the official reflect package that eases dynamic method calling on Go types.
+
+`call` can be useful for rigging routes to handlers on Go types in a dynamic fashion.
