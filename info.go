@@ -93,7 +93,7 @@ func (m MethodInfo) Args() *Args {
 	return rv
 }
 
-// Calls calls the method described by MethodInfo.
+// Call calls the method described by MethodInfo.
 //
 // An appropriate *Args type can be obtained via MethodInfo.Args().
 //

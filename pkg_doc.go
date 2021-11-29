@@ -46,7 +46,7 @@
 //	mux := Handle( "/", router.Handler() )
 //
 // Creating such a router is difficult.  It requires reflect and unfortunately reflect has caught a bad
-// reputation in the Go community.  Code invoking reflect can become unwieldly and difficult to understand.
+// reputation in the Go community.  Code invoking reflect can become unwieldy and difficult to understand.
 // Calls into reflect are also much slower than equivalent code not using reflect; therefore the amount
 // of reflect calls needs to be carefully controlled and unnecessary calls avoided -- further complicating code
 // involving reflect.
