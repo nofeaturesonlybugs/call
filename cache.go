@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// TypeInfoCache
+// TypeInfoCache inspects a value or a reflect.Type and returns an appropriate Methods type.
 type TypeInfoCache interface {
 	// Stat accepts an arbitrary variable and returns the associated Methods structure where
 	// Methods.Receiver references V.
@@ -87,7 +87,7 @@ func (me *typeInfoCache) StatType(T reflect.Type) Methods {
 		}
 		//
 		info := MethodInfo{
-			Receiver:     receiver,
+			receiver:     receiver,
 			Name:         method.Name,
 			Method:       method,
 			NumIn:        numIn,

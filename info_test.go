@@ -3,6 +3,7 @@ package call_test
 import (
 	"net/http"
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/nofeaturesonlybugs/call"
@@ -20,13 +21,25 @@ func Test_MethodInfo_Call(t *testing.T) {
 			}
 		}
 		//
-		var values []reflect.Value
-		values, _ = m.Args()
-		m.Call(values)
+		args := m.Args()
+		m.Call(args)
+	})
+	t.Run("ManyArgs.Many", func(t *testing.T) {
+		var many examples.ManyArgs
+		methods := call.Stat(many)
+		var m call.MethodInfo
+		for _, m = range methods.Methods {
+			if m.Name == "Many" {
+				break
+			}
+		}
+		//
+		args := m.Args()
+		m.Call(args)
 	})
 }
 
-func Benchmark_MethodInfo_Call_PerformanceBaseline(b *testing.B) {
+func Benchmark_MethodInfo_Call_StandardBaseline(b *testing.B) {
 	var w *http.ResponseWriter
 	var req **http.Request
 	var sess *examples.Session
@@ -47,7 +60,7 @@ func Benchmark_MethodInfo_Call_PerformanceBaseline(b *testing.B) {
 		})
 	}
 }
-func Benchmark_MethodInfo_Call_PerformanceZero(b *testing.B) {
+func Benchmark_MethodInfo_Call_Baseline(b *testing.B) {
 	var talk examples.HTTP
 	methods := call.Stat(talk)
 	var m call.MethodInfo
@@ -60,32 +73,35 @@ func Benchmark_MethodInfo_Call_PerformanceZero(b *testing.B) {
 	// An implementation of MethodInfo.Args that is pure dumb and uses none of the performance
 	// struct members.
 	// Performance hit: Interface values are always recreated and not obtained from InCache.
-	Args := func() (Values []reflect.Value, Pointers []interface{}) {
+	Args := func() *call.Args {
 		var value, ptr reflect.Value
-		Values, Pointers = make([]reflect.Value, m.NumIn), make([]interface{}, m.NumIn)
+		rv := &call.Args{
+			Values:   make([]reflect.Value, m.NumIn),
+			Pointers: make([]interface{}, m.NumIn),
+		}
 		for k, typ := range m.InTypes {
 			if k == 0 {
-				Values[k] = m.Receiver.ReflectValue
-				Pointers[k] = nil
+				rv.Values[k] = methods.Receiver.ReflectValue
+				rv.Pointers[k] = nil
 				continue
 			}
 			ptr = reflect.New(typ)
 			value = reflect.Indirect(ptr)
-			Values[k] = value
-			Pointers[k] = ptr.Interface()
+			rv.Values[k] = value
+			rv.Pointers[k] = ptr.Interface()
 		}
-		return
+		return rv
 	}
 	//
 	b.ResetTimer()
-	var values []reflect.Value
+	var args *call.Args
 	for k := 0; k < b.N; k++ {
-		values, _ = Args()
-		m.Call(values)
+		args = Args()
+		m.Call(args)
 	}
 }
 
-func Benchmark_MethodInfo_Call_PerformanceWithInCache(b *testing.B) {
+func Benchmark_MethodInfo_Call_WithInCache(b *testing.B) {
 	var talk examples.HTTP
 	methods := call.Stat(talk)
 	var m call.MethodInfo
@@ -106,36 +122,127 @@ func Benchmark_MethodInfo_Call_PerformanceWithInCache(b *testing.B) {
 	for _, arg := range m.InCacheArgs {
 		InCache[arg.N] = arg.V
 	}
-	Args := func() (Values []reflect.Value, Pointers []interface{}) {
+	Args := func() *call.Args {
 		var value, ptr reflect.Value
-		Values, Pointers = make([]reflect.Value, m.NumIn), make([]interface{}, m.NumIn)
+		rv := &call.Args{
+			Values:   make([]reflect.Value, m.NumIn),
+			Pointers: make([]interface{}, m.NumIn),
+		}
 		for k, typ := range m.InTypes {
 			if k == 0 {
-				Values[k] = m.Receiver.ReflectValue
-				Pointers[k] = nil
+				rv.Values[k] = methods.Receiver.ReflectValue
+				rv.Pointers[k] = nil
 				continue
 			} else if v, ok := InCache[k]; ok {
-				Values[k] = v
-				Pointers[k] = nil
+				rv.Values[k] = v
+				rv.Pointers[k] = nil
 				continue
 			}
 			ptr = reflect.New(typ)
 			value = reflect.Indirect(ptr)
-			Values[k] = value
-			Pointers[k] = ptr.Interface()
+			rv.Values[k] = value
+			rv.Pointers[k] = ptr.Interface()
 		}
-		return
+		return rv
 	}
 	//
 	b.ResetTimer()
-	var values []reflect.Value
+	var args *call.Args
 	for k := 0; k < b.N; k++ {
-		values, _ = Args()
-		m.Call(values)
+		args = Args()
+		m.Call(args)
 	}
 }
 
-func Benchmark_MethodInfo_Call_PerformanceCurrent(b *testing.B) {
+func Benchmark_MethodInfo_Call_UsingArgs(b *testing.B) {
+	var talk examples.HTTP
+	methods := call.Stat(talk)
+	var m call.MethodInfo
+	for _, m = range methods.Methods {
+		if m.Name == "Handler" {
+			break
+		}
+	}
+	//
+	// An implementation of MethodInfo.Args that uses InCreateArgs and InCacheArgs
+	// as slices for argument creation.
+	//
+	// Performance gain: No map lookups for argument indexes or type.
+	// Performance hit: Lots of allocation hits the garbage collector.
+	Args := func() *call.Args {
+		var V reflect.Value
+		rv := &call.Args{
+			Values:   make([]reflect.Value, m.NumIn),
+			Pointers: make([]interface{}, m.NumIn),
+		}
+		rv.Values[0], rv.Pointers[0] = methods.Receiver.ReflectValue, nil
+		for _, arg := range m.InCreateArgs {
+			V = reflect.New(arg.T)
+			rv.Values[arg.N], rv.Pointers[arg.N] = V.Elem(), V.Interface()
+		}
+		for _, arg := range m.InCacheArgs {
+			rv.Values[arg.N], rv.Pointers[arg.N] = arg.V, nil
+		}
+		return rv
+	}
+	//
+	b.ResetTimer()
+	var args *call.Args
+	for k := 0; k < b.N; k++ {
+		args = Args()
+		m.Call(args)
+	}
+}
+
+func Benchmark_MethodInfo_Call_UsingPool(b *testing.B) {
+	var talk examples.HTTP
+	methods := call.Stat(talk)
+	var m call.MethodInfo
+	for _, m = range methods.Methods {
+		if m.Name == "Handler" {
+			break
+		}
+	}
+	//
+	pool := &sync.Pool{
+		New: func() interface{} {
+			return &call.Args{
+				Values:   []reflect.Value{},
+				Pointers: []interface{}{},
+			}
+		},
+	}
+	//
+	// An implementation of MethodInfo.Args that uses InCreateArgs and InCacheArgs alongside
+	// sync.Pool to alleviate burden on garbage collector.
+	Args := func() *call.Args {
+		var V reflect.Value
+		rv := pool.Get().(*call.Args)
+		if m.NumIn > cap(rv.Values) {
+			rv.Values, rv.Pointers = make([]reflect.Value, m.NumIn), make([]interface{}, m.NumIn)
+		}
+		rv.Values, rv.Pointers = rv.Values[:m.NumIn], rv.Pointers[:m.NumIn]
+		rv.Values[0], rv.Pointers[0] = methods.Receiver.ReflectValue, nil
+		for _, arg := range m.InCreateArgs {
+			V = reflect.New(arg.T)
+			rv.Values[arg.N], rv.Pointers[arg.N] = V.Elem(), V.Interface()
+		}
+		for _, arg := range m.InCacheArgs {
+			rv.Values[arg.N], rv.Pointers[arg.N] = arg.V, nil
+		}
+		return rv
+	}
+	//
+	b.ResetTimer()
+	var args *call.Args
+	for k := 0; k < b.N; k++ {
+		args = Args()
+		m.Call(args)
+		pool.Put(args)
+	}
+}
+
+func Benchmark_MethodInfo_Call_Current(b *testing.B) {
 	var talk examples.HTTP
 	methods := call.Stat(talk)
 	var m call.MethodInfo
@@ -146,9 +253,26 @@ func Benchmark_MethodInfo_Call_PerformanceCurrent(b *testing.B) {
 	}
 	//
 	b.ResetTimer()
-	var values []reflect.Value
+	var args *call.Args
 	for k := 0; k < b.N; k++ {
-		values, _ = m.Args()
-		m.Call(values)
+		args = m.Args()
+		m.Call(args)
+	}
+}
+
+func Benchmark_MethodInfo_Call_ManyArgs(b *testing.B) {
+	var many examples.ManyArgs
+	methods := call.Stat(many)
+	var m call.MethodInfo
+	for _, m = range methods.Methods {
+		if m.Name == "Many" {
+			break
+		}
+	}
+	b.ResetTimer()
+	for k := 0; k < b.N; k++ {
+		args := m.Args()
+		m.Call(args)
+
 	}
 }

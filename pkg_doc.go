@@ -55,4 +55,18 @@
 // from the reflect calls required for the router to work.  It can be tested and benchmarked indepedently
 // of where it is used.  Thus we can gain confidence that general purpose routers are working correctly
 // and performing well.
+//
+// Performance
+//
+// This package is carefully benchmarked and some best efforts have been made to increase performance
+// where possible.
+//
+// The TypeInfoCache is used to prevent overhead when creating Methods structures.  The Stat() function
+// uses a global instace of TypeInfoCache.  In other words repeatedly calling Stat(V), Stat(V1), etc.
+// where all values have the same type performs well.
+//
+// Invoking a method via MethodInfo.Args() and MethodInfo.Call() uses a shared memory pool.  In short the
+// value returned by MethodInfo.Args() is a pooled resource and is reclaimed during MethodInfo.Call().  See
+// the documentation for MethodInfo.Args() for more information.
+//
 package call
