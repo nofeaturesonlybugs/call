@@ -7,14 +7,14 @@ import (
 )
 
 // Request is used to demonstrate how the call package handles struct or ptr-to-struct
-// types when calling MethodInfo.Args()
+// types when calling Method.Args()
 type Request struct {
 	Origin string
 	Token  string
 }
 
 // Response is used to demonstrate how the call package handles interface types
-// when calling MethodInfo.Args().
+// when calling Method.Args().
 type Response interface {
 	A()
 	B()
@@ -24,6 +24,19 @@ type Response interface {
 type Session interface {
 	Get(string) interface{}
 	Set(string, interface{})
+}
+
+// MapSession implements Session.
+type MapSession map[string]interface{}
+
+// Get returns the value.
+func (m MapSession) Get(key string) interface{} {
+	return m[key]
+}
+
+// Set sets the value.
+func (m MapSession) Set(key string, value interface{}) {
+	m[key] = value
 }
 
 // Talker has a few methods to demonstrate the parent package call.
