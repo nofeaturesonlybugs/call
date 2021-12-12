@@ -108,7 +108,7 @@ Since interface types are provided as nil values by `Args()` you may wish to con
 // In order to prune a type we need its reflect.Type.  Let's pretend we're writing
 // a more general purpose http.Handler and want to prune http.ResponseWriter
 // and *http.Request from types created via `Args()`:
-TypeRequest := reflect.TypeOf(*http.Request(nil))
+TypeRequest := reflect.TypeOf((*http.Request)(nil))
 // This is the idomatic way to get the type of a nil interface.
 TypeResponseWriter := reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
 
@@ -141,90 +141,90 @@ handler := func( w http.ResponseWriter, req *http.Request ) {
 ## A Better http.Handler  
 Let's take some ideas from the previous snippet and create a `http.Handler` factory:
 ```go
-	TypeRequest := reflect.TypeOf((*http.Request)(nil))
-	TypeResponseWriter := reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
+TypeRequest := reflect.TypeOf((*http.Request)(nil))
+TypeResponseWriter := reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
 
-	// Factory accepts a function and turns it into an http.Handler.
-	Factory := func(opaque interface{}) http.Handler {
-		f := call.StatFunc(opaque)
-		pruned := f.PruneIn(TypeRequest, TypeResponseWriter)
-		//
-		// The created handler does not represent a "production-ready" http.Handler but it does
-		// demonstrate how "package call" can be used to:
-		//	+ invoke end-of-chain handlers with adhoc or variable signatures
-		//	+ how to unmarshal and provide data to the handler arguments
-		//		(by unmarshaling application/json requests, for example)
-		fn := func(w http.ResponseWriter, req *http.Request) {
-			args := f.Args()
-			// Before invoking f we should see if we can provide any pruned arguments:
-			for _, arg := range pruned {
-				switch arg.T {
-				case TypeRequest:
-					args.Values[arg.N] = reflect.ValueOf(req)
-				case TypeResponseWriter:
-					args.Values[arg.N] = reflect.ValueOf(w)
-				}
+// Factory accepts a function and turns it into an http.Handler.
+Factory := func(opaque interface{}) http.Handler {
+	f := call.StatFunc(opaque)
+	pruned := f.PruneIn(TypeRequest, TypeResponseWriter)
+	//
+	// The created handler does not represent a "production-ready" http.Handler but it does
+	// demonstrate how "package call" can be used to:
+	//	+ invoke end-of-chain handlers with adhoc or variable signatures
+	//	+ how to unmarshal and provide data to the handler arguments
+	//		(by unmarshaling application/json requests, for example)
+	fn := func(w http.ResponseWriter, req *http.Request) {
+		args := f.Args()
+		// Before invoking f we should see if we can provide any pruned arguments:
+		for _, arg := range pruned {
+			switch arg.T {
+			case TypeRequest:
+				args.Values[arg.N] = reflect.ValueOf(req)
+			case TypeResponseWriter:
+				args.Values[arg.N] = reflect.ValueOf(w)
 			}
-			//
-			// If the request is application/json we will unmarshal into any arguments
-			// that are struct.
-			// NB:  An intelligent handler factory would have examined f.InCreate and possibly set a
-			//		hasJSON=true|false flag and could theoretically skip this logic block if the
-			//		end-of-chain handler doesn't have targets for JSON data.
-			if req.Header.Get("Content-Type") == "application/json" {
-				body, err := io.ReadAll(req.Body)
-				if err != nil {
+		}
+		//
+		// If the request is application/json we will unmarshal into any arguments
+		// that are struct.
+		// NB:  An intelligent handler factory would have examined f.InCreate and possibly set a
+		//		hasJSON=true|false flag and could theoretically skip this logic block if the
+		//		end-of-chain handler doesn't have targets for JSON data.
+		if req.Header.Get("Content-Type") == "application/json" {
+			body, err := io.ReadAll(req.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			for _, arg := range f.InCreate {
+				if arg.T.Kind() != reflect.Struct {
+					continue
+				}
+				if err = json.Unmarshal(body, args.Pointers[arg.N]); err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
-				for _, arg := range f.InCreate {
-					if arg.T.Kind() != reflect.Struct {
-						continue
-					}
-					if err = json.Unmarshal(body, args.Pointers[arg.N]); err != nil {
-						http.Error(w, err.Error(), http.StatusInternalServerError)
-						return
-					}
-				}
 			}
-			//
-			// NB:  This handler doesn't do anything with any return values.  A better handler
-			// 		factory would probably make use of any error returned or possibly accept
-			//		some type of result and then write to the response appropriately.
-			f.Call(args)
 		}
-		return http.HandlerFunc(fn)
+		//
+		// NB:  This handler doesn't do anything with any return values.  A better handler
+		// 		factory would probably make use of any error returned or possibly accept
+		//		some type of result and then write to the response appropriately.
+		f.Call(args)
 	}
+	return http.HandlerFunc(fn)
+}
 
-	type LoginRequest struct {
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	Login := func(w http.ResponseWriter, post LoginRequest) {
-		fmt.Fprintf(w, "%v", post)
-	}
-	Logout := func(w http.ResponseWriter) {
-		fmt.Fprint(w, "Logged out!")
-	}
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+Login := func(w http.ResponseWriter, post LoginRequest) {
+	fmt.Fprintf(w, "%v", post)
+}
+Logout := func(w http.ResponseWriter) {
+	fmt.Fprint(w, "Logged out!")
+}
 
-	mux := http.NewServeMux()
-	mux.Handle("/login", Factory(Login))
-	mux.Handle("/logout", Factory(Logout))
+mux := http.NewServeMux()
+mux.Handle("/login", Factory(Login))
+mux.Handle("/logout", Factory(Logout))
 
-	// /login
-	w := httptest.NewRecorder()
-	w.Body = &bytes.Buffer{}
-	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"test","password":"s3cr3t"}`))
-	req.Header.Set("Content-Type", "application/json")
-	mux.ServeHTTP(w, req)
-	fmt.Println(w.Body.String())
+// /login
+w := httptest.NewRecorder()
+w.Body = &bytes.Buffer{}
+req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{"username":"test","password":"s3cr3t"}`))
+req.Header.Set("Content-Type", "application/json")
+mux.ServeHTTP(w, req)
+fmt.Println(w.Body.String())
 
-	// /logout
-	w = httptest.NewRecorder()
-	w.Body = &bytes.Buffer{}
-	req = httptest.NewRequest(http.MethodPost, "/logout", nil)
-	mux.ServeHTTP(w, req)
-	fmt.Println(w.Body.String())
+// /logout
+w = httptest.NewRecorder()
+w.Body = &bytes.Buffer{}
+req = httptest.NewRequest(http.MethodPost, "/logout", nil)
+mux.ServeHTTP(w, req)
+fmt.Println(w.Body.String())
 
 // prints:
 // {test s3cr3t}
