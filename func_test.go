@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -153,11 +152,16 @@ func ExampleFunc_hTTPHandlerFactory() {
 			//		hasJSON=true|false flag and could theoretically skip this logic block if the
 			//		end-of-chain handler doesn't have targets for JSON data.
 			if req.Header.Get("Content-Type") == "application/json" {
-				body, err := io.ReadAll(req.Body)
+				// NB: Originally used io.ReadAll() but removed to support Go <= 1.15
+				//     It's just an example anyways.
+				b := make([]byte, 2048)
+				read, err := req.Body.Read(b)
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
 					return
 				}
+				body := b[0:read]
+				//
 				for _, arg := range f.InCreate {
 					if arg.T.Kind() != reflect.Struct {
 						continue
