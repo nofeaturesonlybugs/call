@@ -15,5 +15,5 @@
 
 coverage.txt
 *.prof
-*.prof
+*.profile
 profile*.png
