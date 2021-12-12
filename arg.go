@@ -20,7 +20,7 @@ var argPool = sync.Pool{
 	},
 }
 
-// Arg describes a method argument by its type T, its index N, and if it can be
+// Arg describes a function or method argument by its type T, its index N, and if it can be
 // known or calculated in advance its value V.
 type Arg struct {
 	// Argument index.
@@ -31,12 +31,12 @@ type Arg struct {
 	V reflect.Value
 }
 
-// Args is created by calling MethodInfo.Args() and passed to MethodInfo.Call().
+// Args is created by calling Args() on a Func or a Method.
 //
-// Args is the collection of method arguments represented as two slices.  The Values
-// slice represents the arguments as []reflect.Value while the Pointers slice
-// represents addressable values that can be passed to decoders or unmarshallers
-// to populate the arguments dynamically.
+// Args contains arguments as a pair of slices.  The Values slice represents
+// the arguments as []reflect.Value while the Pointers slice represents
+// addressable values that can be passed to decoders or unmarshalers to
+// populate the arguments dynamically.
 //
 // Not all Values have an associated pointer; when a value with index K does not
 // have a pointer Pointers[k] is nil.
