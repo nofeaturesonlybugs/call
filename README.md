@@ -1,14 +1,15 @@
-[![Documentation](https://godoc.org/github.com/nofeaturesonlybugs/call?status.svg)](http://godoc.org/github.com/nofeaturesonlybugs/call)
+[![Go Reference](https://pkg.go.dev/badge/github.com/nofeaturesonlybugs/call.svg)](https://pkg.go.dev/github.com/nofeaturesonlybugs/call)
 [![Go Report Card](https://goreportcard.com/badge/github.com/nofeaturesonlybugs/call)](https://goreportcard.com/report/github.com/nofeaturesonlybugs/call)
-[![Build Status](https://travis-ci.com/nofeaturesonlybugs/call.svg?branch=master)](https://travis-ci.com/nofeaturesonlybugs/call)
+[![Build Status](https://app.travis-ci.com/nofeaturesonlybugs/call.svg?branch=master)](https://app.travis-ci.com/nofeaturesonlybugs/call)
 [![codecov](https://codecov.io/gh/nofeaturesonlybugs/call/branch/master/graph/badge.svg)](https://codecov.io/gh/nofeaturesonlybugs/call)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Package `call` is a small wrapper around the official reflect package that eases dynamic function or method calls.
 
-`call` can be useful for rigging routes to handlers on Go types in a dynamic fashion.  An example of that will follow but let's first see some examples of `call` in action.
+`call` can be useful for rigging routes to handlers on Go types in a dynamic fashion. An example of that will follow but let's first see some examples of `call` in action.
 
-## A Useless Case  
+## A Useless Case
+
 ```go
 fn := func(str string, num int) {
     fmt.Printf("str=%v num=%v\n", str, num)
@@ -25,8 +26,10 @@ The call to `StatFunc` returns a `Func` type that can be used to create function
 
 When `Args()` creates arguments it creates zero values for the argument types.
 
-## Setting Argument Values  
-The previous example is somewhat useless because the function is called with a zero-value for each argument.  Now we'll set the argument values using the `Pointers` field of `Args`:  
+## Setting Argument Values
+
+The previous example is somewhat useless because the function is called with a zero-value for each argument. Now we'll set the argument values using the `Pointers` field of `Args`:
+
 ```go
 // Same function as before.
 fn := func(str string, num int) {
@@ -57,8 +60,10 @@ f.Call(args)
 // str=Hi! num=42
 ```
 
-## Struct Arguments  
-The `Pointers` field is also useful for unmarshaling data into function arguments:  
+## Struct Arguments
+
+The `Pointers` field is also useful for unmarshaling data into function arguments:
+
 ```go
 type Request struct {
     Str string `json:"str"`
@@ -82,8 +87,10 @@ f.Call(args)
 // str=Hi! num=42
 ```
 
-## Interface Arguments  
-When an argument is an interface I its value is `I(nil)` and its pointer is also `nil`:  
+## Interface Arguments
+
+When an argument is an interface I its value is `I(nil)` and its pointer is also `nil`:
+
 ```go
 // Interfaces are always passed as nil.
 fn := func(w http.ResponseWriter) {
@@ -103,7 +110,9 @@ f.Call(args)
 ```
 
 ## Interface Arguments & Pruning <sup>The Beginnings of an http.Handler</sup>
-Since interface types are provided as nil values by `Args()` you may wish to configure the `*Func` to stop managing such types.  You do this by calling `PruneIn()`, which accepts a variadic list of `reflect.Type`:
+
+Since interface types are provided as nil values by `Args()` you may wish to configure the `*Func` to stop managing such types. You do this by calling `PruneIn()`, which accepts a variadic list of `reflect.Type`:
+
 ```go
 // In order to prune a type we need its reflect.Type.  Let's pretend we're writing
 // a more general purpose http.Handler and want to prune http.ResponseWriter
@@ -138,8 +147,10 @@ handler := func( w http.ResponseWriter, req *http.Request ) {
 }
 ```
 
-## A Better http.Handler  
+## A Better http.Handler
+
 Let's take some ideas from the previous snippet and create a `http.Handler` factory:
+
 ```go
 TypeRequest := reflect.TypeOf((*http.Request)(nil))
 TypeResponseWriter := reflect.TypeOf((*http.ResponseWriter)(nil)).Elem()
@@ -231,15 +242,16 @@ fmt.Println(w.Body.String())
 // Logged out!
 ```
 
-## API Consistency and Breaking Changes  
-I am making a very concerted effort to break the API as little as possible while adding features or fixing bugs.  However this software is currently in a pre-1.0.0 version and breaking changes *are* allowed under standard semver.  As the API approaches a stable 1.0.0 release I will list any such breaking changes here and they will always be signaled by a bump in *minor* version.
+## API Consistency and Breaking Changes
 
-* 0.1.x ⭢ 0.2.0  
-  * Several types have been renamed to be more ergonomic:
-    + `Methods` renamed to `Instance`
-    + `MethodInfo` renamed to `Method`
-    + `MethodResult` renamed to `Result`
-    + Fields `InCacheArgs` and `InCreateArgs` have had the `Args` suffix dropped and are now simply `InCache` and `InCreate`.
-    + `Receiver` type dropped entirely; the `Rebind()` function now exists on `Instance`.
-  * `call` now supports invoking methods on types or regular functions.  To support this a new type `Func` has been introduced.  `Func` was created by pulling several fields out of `Method` (previously `MethodInfo`).  `Method` retains access to this extracted information by embedding `*Func`; in other words `Func` is for calling regular functions, `Method` is for calling functions that have receivers, and `Method` is a superset of `Func`.
-  * Added a new `type Methods []Method` which has a helper function for finding a method by name; note that this `Methods` type is not the same nor is it compatible with `Methods` type in the previous release.
+I am making a very concerted effort to break the API as little as possible while adding features or fixing bugs. However this software is currently in a pre-1.0.0 version and breaking changes _are_ allowed under standard semver. As the API approaches a stable 1.0.0 release I will list any such breaking changes here and they will always be signaled by a bump in _minor_ version.
+
+-   0.1.x ⭢ 0.2.0
+    -   Several types have been renamed to be more ergonomic:
+        -   `Methods` renamed to `Instance`
+        -   `MethodInfo` renamed to `Method`
+        -   `MethodResult` renamed to `Result`
+        -   Fields `InCacheArgs` and `InCreateArgs` have had the `Args` suffix dropped and are now simply `InCache` and `InCreate`.
+        -   `Receiver` type dropped entirely; the `Rebind()` function now exists on `Instance`.
+    -   `call` now supports invoking methods on types or regular functions. To support this a new type `Func` has been introduced. `Func` was created by pulling several fields out of `Method` (previously `MethodInfo`). `Method` retains access to this extracted information by embedding `*Func`; in other words `Func` is for calling regular functions, `Method` is for calling functions that have receivers, and `Method` is a superset of `Func`.
+    -   Added a new `type Methods []Method` which has a helper function for finding a method by name; note that this `Methods` type is not the same nor is it compatible with `Methods` type in the previous release.
